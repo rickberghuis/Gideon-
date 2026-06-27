@@ -42,6 +42,21 @@ browser (it falls back to *deny* after the configured timeout, so it never hangs
 process also runs the heartbeat in the background, so one command gives you chat + proactivity.
 Needs `ANTHROPIC_API_KEY`. Bound to `127.0.0.1` only — not exposed to your network.
 
+**Voice in the browser:** when voice is enabled in `config.toml` (and the keys work), a 🎤
+button appears. Click to record, click again to send — Gideon transcribes (Deepgram), runs the
+turn, and speaks the reply back through your browser (ElevenLabs). The browser asks for mic
+permission the first time; this works over `http` because `127.0.0.1` is a secure context.
+
+**Run it at login (macOS):**
+
+```bash
+bash scripts/install-login-agent.sh             # start now + every login; restarts if it crashes
+bash scripts/install-login-agent.sh uninstall   # stop + remove
+```
+
+Or double-click **`scripts/Start Gideon.command`** in Finder to launch it and open the browser.
+Logs go to `state/web.log`.
+
 In the text REPL: `dismiss <id>` clears an inbox notice, `/cost` shows the session cost,
 `/kill` `/unkill` toggle the kill switch, `exit` quits.
 

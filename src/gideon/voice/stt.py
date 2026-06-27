@@ -21,9 +21,15 @@ class Transcriber:
         if not pcm_bytes:
             return ""
         # Wrap raw PCM in a WAV container so Deepgram auto-detects rate/encoding.
-        wav = _wrap_pcm_as_wav(pcm_bytes, sample_rate)
+        return self.transcribe_audio(_wrap_pcm_as_wav(pcm_bytes, sample_rate))
+
+    def transcribe_audio(self, audio_bytes: bytes) -> str:
+        """Transcribe already-containerized audio (WAV/WebM/OGG/MP3 — e.g. browser mic
+        recordings). Deepgram auto-detects the container."""
+        if not audio_bytes:
+            return ""
         response = self._client.listen.v1.media.transcribe_file(
-            request=wav,
+            request=audio_bytes,
             model=self._model,
             smart_format=True,
             language="en",

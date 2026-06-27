@@ -47,6 +47,18 @@ class Speaker:
         )
         return b"".join(chunk for chunk in audio if chunk)
 
+    def synthesize_mp3(self, text: str) -> bytes:
+        """Synthesize to MP3 bytes — what the browser face plays directly via an <audio>."""
+        if not self._voice_id:
+            raise RuntimeError("No elevenlabs_voice_id set in config.toml")
+        audio = self._client.text_to_speech.convert(
+            voice_id=self._voice_id,
+            model_id=self._model,
+            text=text,
+            output_format="mp3_44100_128",
+        )
+        return b"".join(chunk for chunk in audio if chunk)
+
     def play_pcm(self, pcm: bytes) -> None:
         """Play raw 16 kHz mono PCM. Separate from synth so playback errors (no audio
         device) don't get confused with synthesis errors."""

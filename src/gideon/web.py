@@ -77,6 +77,38 @@ class _App:
         self.confirmer = WebConfirmer(timeout)
         self.agent, self.audit, self.memory, self.inbox = build_agent(confirmer=self.confirmer)
         self.turn_lock = threading.Lock()  # one conversational turn at a time
+        self.voice_enabled = bool(config.voice.get("enabled"))
+        self._transcriber = None
+        self._speaker = None
+
+    def _voice_components(self):
+        """Lazily build STT/TTS so a missing audio dep only breaks voice, not the whole face."""
+        if self._transcriber is None:
+            from .voice.stt import Transcriber
+            from .voice.tts import Speaker
+
+            cfg = load_config()
+            self._transcriber = Transcriber(cfg)
+            self._speaker = Speaker(cfg)
+        return self._transcriber, self._speaker
+
+    def handle_voice(self, audio_bytes: bytes) -> dict[str, Any]:
+        """Browser mic → transcript → same agent core → spoken reply (mp3, base64)."""
+        import base64
+
+        transcriber, speaker = self._voice_components()
+        heard = transcriber.transcribe_audio(audio_bytes)
+        if not heard:
+            return {"transcript": "", "reply": "", "error": "Didn't catch that."}
+        with self.turn_lock:
+            reply = self.agent.send(heard)
+        out: dict[str, Any] = {"transcript": heard, "reply": reply}
+        try:
+            mp3 = speaker.synthesize_mp3(reply)
+            out["audio"] = base64.b64encode(mp3).decode("ascii")
+        except Exception as exc:
+            out["tts_error"] = str(exc)[:200]  # reply still shows as text
+        return out
 
     def state(self) -> dict[str, Any]:
         return {
@@ -87,6 +119,7 @@ class _App:
             ],
             "kill": kill_switch_engaged(load_config()),
             "cost": round(self.audit.session_cost_usd, 4),
+            "voice": self.voice_enabled,
         }
 
 
@@ -126,7 +159,21 @@ class _Handler(BaseHTTPRequestHandler):
         else:
             self._send(404, b"not found", "text/plain")
 
+    def _read_raw(self) -> bytes:
+        length = int(self.headers.get("Content-Length", 0))
+        return self.rfile.read(length) if length else b""
+
     def do_POST(self) -> None:
+        if self.path == "/voice":
+            audio = self._read_raw()
+            try:
+                self._json(APP.handle_voice(audio))
+            except RuntimeError as exc:  # missing key / voice id
+                self._json({"error": str(exc)})
+            except Exception as exc:
+                self._json({"error": f"voice failed: {str(exc)[:200]}"})
+            return
+
         body = self._read_json()
         if self.path == "/chat":
             message = (body.get("message") or "").strip()
@@ -214,7 +261,10 @@ _INDEX_HTML = """<!doctype html>
   #in { flex:1; resize:none; background:var(--panel); border:1px solid var(--line);
         color:var(--text); border-radius:10px; padding:10px 12px; font:inherit; max-height:120px; }
   #send { background:var(--me); color:#fff; }
-  #send:disabled { opacity:.5; cursor:default; }
+  #send:disabled, #mic:disabled { opacity:.5; cursor:default; }
+  #mic { background:var(--bot); color:var(--text); font-size:16px; }
+  #mic.rec { background:#7a2a2a; color:#fff; animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:.55; } }
   .typing { color:var(--muted); font-style:italic; }
 </style>
 </head>
@@ -240,6 +290,7 @@ _INDEX_HTML = """<!doctype html>
   <div id="log"></div>
   <footer>
     <textarea id="in" rows="1" placeholder="Talk to Gideon…  (Enter to send)"></textarea>
+    <button id="mic" title="Click to talk, click again to send" style="display:none">🎤</button>
     <button id="send" onclick="send()">Send</button>
   </footer>
 </div>
@@ -335,6 +386,55 @@ async function refresh() {
   kill.classList.toggle('on', !!s.kill);
   kill.textContent = s.kill ? 'heartbeat: paused' : 'heartbeat: on';
   document.getElementById('cost').textContent = '$' + (s.cost || 0).toFixed(4);
+  document.getElementById('mic').style.display = s.voice ? 'block' : 'none';
+}
+
+// --- voice: click mic to record, click again to send ---
+const mic = document.getElementById('mic');
+let mediaRecorder = null, chunks = [], recording = false;
+
+mic.onclick = () => recording ? stopRec() : startRec();
+
+async function startRec() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    mediaRecorder = new MediaRecorder(stream);
+    chunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      await sendVoice(new Blob(chunks, {type: mediaRecorder.mimeType || 'audio/webm'}));
+    };
+    mediaRecorder.start();
+    recording = true; mic.classList.add('rec'); mic.textContent = '⏹';
+  } catch (e) { bubble('⚠️ microphone permission denied', 'bot'); }
+}
+
+function stopRec() {
+  if (mediaRecorder && recording) {
+    mediaRecorder.stop(); recording = false;
+    mic.classList.remove('rec'); mic.textContent = '🎤';
+  }
+}
+
+async function sendVoice(blob) {
+  sendBtn.disabled = true; mic.disabled = true;
+  const meMsg = bubble('🎤 …', 'me');
+  const typing = bubble('listening…', 'bot'); typing.classList.add('typing');
+  try {
+    const r = await fetch('/voice', {method: 'POST',
+      headers: {'Content-Type': blob.type || 'audio/webm'}, body: blob});
+    const data = await r.json();
+    typing.classList.remove('typing');
+    if (data.error) { meMsg.textContent = '🎤'; typing.textContent = '⚠️ ' + data.error; }
+    else {
+      meMsg.textContent = data.transcript || '(unclear)';
+      typing.textContent = data.reply || '(no reply)';
+      if (data.audio) new Audio('data:audio/mp3;base64,' + data.audio).play();
+    }
+  } catch (e) {
+    typing.classList.remove('typing'); typing.textContent = '⚠️ voice request failed';
+  } finally { sendBtn.disabled = false; mic.disabled = false; refresh(); }
 }
 
 input.addEventListener('keydown', e => {
