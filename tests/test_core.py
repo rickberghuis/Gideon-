@@ -199,3 +199,38 @@ def test_tier6_kill_switch(tmp_path, monkeypatch):
     assert safety.kill_switch_engaged() is True
     safety.release_kill_switch()
     assert safety.kill_switch_engaged() is False
+
+
+# --- Web face: the browser confirmation gate (same core, different door) ------------------
+
+def test_web_confirmer_timeout_denies():
+    """The web gate falls back to the safe default (deny) if no one answers in time."""
+    from gideon.web import WebConfirmer
+
+    conf = WebConfirmer(timeout_seconds=0.2)
+    assert conf("send_message", {"to": "Bob"}, "send a message") is False
+
+
+def test_web_confirmer_allow_and_deny():
+    import threading
+    from gideon.web import WebConfirmer
+
+    for verdict in (True, False):
+        conf = WebConfirmer(timeout_seconds=5)
+        result = {}
+
+        def ask():
+            result["r"] = conf("send_message", {}, "send a message")
+
+        t = threading.Thread(target=ask)
+        t.start()
+        # wait for the pending action to surface, then answer it
+        for _ in range(50):
+            snap = conf.snapshot()
+            if snap:
+                break
+            threading.Event().wait(0.02)
+        assert snap is not None
+        conf.resolve(snap["id"], verdict)
+        t.join(timeout=2)
+        assert result["r"] is verdict

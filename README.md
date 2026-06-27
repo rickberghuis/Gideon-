@@ -24,11 +24,23 @@ pytest -q
 
 ```bash
 gideon              # text conversation — the always-available path
+gideon --web        # browser chat UI at http://127.0.0.1:8000  (--port to change)
 gideon --voice      # push-to-talk (hold space, speak, release)   [needs .[voice] + keys]
+gideon --voice-check# synthesize+play one line to test the ElevenLabs key/voice
 gideon --heartbeat  # the proactive background loop                [run in a second terminal]
 gideon --kill       # pause ALL proactive behavior (kill switch)
 gideon --unkill     # resume
 ```
+
+### The web face (`gideon --web`)
+
+A localhost-only chat UI — the same agent core, a different door in. It shows replies, the
+heartbeat inbox (with dismiss buttons), the running cost, and a heartbeat on/off toggle (the
+kill switch). When the agent wants a consequential action, an **Allow / Deny** banner appears
+and the turn waits for your click — the same confirmation gate as the terminal, just in the
+browser (it falls back to *deny* after the configured timeout, so it never hangs). The web
+process also runs the heartbeat in the background, so one command gives you chat + proactivity.
+Needs `ANTHROPIC_API_KEY`. Bound to `127.0.0.1` only — not exposed to your network.
 
 In the text REPL: `dismiss <id>` clears an inbox notice, `/cost` shows the session cost,
 `/kill` `/unkill` toggle the kill switch, `exit` quits.
@@ -43,6 +55,7 @@ In the text REPL: `dismiss <id>` clears an inbox notice, `/cost` shows the sessi
 | The memory  | `memory.py`, `state/memory/`  | 4    |
 | The heartbeat| `heartbeat.py`               | 5    |
 | The rails   | `safety.py`, `audit.py`, `config.toml` | 6 |
+| The face    | `web.py` (localhost chat UI)  | +    |
 
 Every input path — typed, spoken, heartbeat-initiated — flows through `Agent.send()`.
 

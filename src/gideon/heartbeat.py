@@ -191,6 +191,13 @@ def run_once(config: Config, inbox: Inbox, schedule: dict[str, float], now: floa
             inbox.add(name, notice)
 
 
+def _tick(config: Config, inbox: Inbox, schedule: dict[str, float]) -> None:
+    """One beat: run due checks if enabled and not paused, then persist the schedule."""
+    if config.heartbeat.get("enabled", True) and not kill_switch_engaged(config):
+        run_once(config, inbox, schedule, time.time())
+        write_json(SCHEDULE_PATH, schedule)  # persist next-due across restarts
+
+
 def heartbeat_loop() -> None:
     """Entry point for `gideon --heartbeat`. Runs until interrupted."""
     inbox = Inbox()
@@ -199,10 +206,18 @@ def heartbeat_loop() -> None:
     try:
         while True:
             config = load_config()  # reload each tick: config edits take effect live
-            tick = int(config.heartbeat.get("tick_seconds", 30))
-            if config.heartbeat.get("enabled", True) and not kill_switch_engaged(config):
-                run_once(config, inbox, schedule, time.time())
-                write_json(SCHEDULE_PATH, schedule)  # persist next-due across restarts
-            time.sleep(tick)
+            _tick(config, inbox, schedule)
+            time.sleep(int(config.heartbeat.get("tick_seconds", 30)))
     except KeyboardInterrupt:
         print("\n💤 Heartbeat stopped.")
+
+
+def run_background(stop_event) -> None:
+    """Same loop, driven by a threading.Event — used by the web server so one process
+    gives you both the chat face and a beating heartbeat. Relocatable as ever."""
+    inbox = Inbox()
+    schedule: dict[str, float] = read_json(SCHEDULE_PATH, {})
+    while not stop_event.is_set():
+        config = load_config()
+        _tick(config, inbox, schedule)
+        stop_event.wait(int(config.heartbeat.get("tick_seconds", 30)))

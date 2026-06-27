@@ -25,8 +25,11 @@ from .safety import engage_kill_switch, release_kill_switch, terminal_confirmer
 from .tools.registry import build_registry
 
 
-def build_agent(on_text=None) -> tuple[Agent, Audit, Memory, Inbox]:
-    """Assemble the full assistant from its independently-built parts."""
+def build_agent(on_text=None, confirmer=terminal_confirmer) -> tuple[Agent, Audit, Memory, Inbox]:
+    """Assemble the full assistant from its independently-built parts.
+
+    The confirmer is injectable so each front-end supplies its own gate: terminal prompt
+    for text/voice, a browser prompt for the web face — the gate itself is identical."""
     ensure_state_dirs()
     config = load_config()
     audit = Audit(config)
@@ -37,7 +40,7 @@ def build_agent(on_text=None) -> tuple[Agent, Audit, Memory, Inbox]:
         registry=registry,
         memory=memory,
         audit=audit,
-        confirmer=terminal_confirmer,
+        confirmer=confirmer,
         on_text=on_text,
     )
     return agent, audit, memory, Inbox()
@@ -241,14 +244,20 @@ def run_voice_check() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(prog="gideon", description="Gideon — voice-first assistant")
     group = parser.add_mutually_exclusive_group()
+    group.add_argument("--web", action="store_true", help="browser chat UI at localhost")
     group.add_argument("--voice", action="store_true", help="push-to-talk voice mode")
     group.add_argument("--voice-check", action="store_true", help="synthesize+play one test line")
     group.add_argument("--heartbeat", action="store_true", help="run the proactive background loop")
     group.add_argument("--kill", action="store_true", help="engage kill switch (pause proactive)")
     group.add_argument("--unkill", action="store_true", help="release kill switch")
+    parser.add_argument("--port", type=int, default=8000, help="port for --web (default 8000)")
     args = parser.parse_args()
 
-    if args.kill:
+    if args.web:
+        from .web import run_web
+
+        run_web(args.port)
+    elif args.kill:
         print(engage_kill_switch())
     elif args.unkill:
         print(release_kill_switch())
