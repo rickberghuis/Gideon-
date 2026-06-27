@@ -189,12 +189,60 @@ def run_voice() -> None:
         print("\nbye 👋")
 
 
+# --- voice check (synthesize one line) ---------------------------------------------------
+
+def run_voice_check() -> None:
+    """Synthesize and play one test line, so you can confirm the ElevenLabs key/voice work
+    without doing a full conversational turn."""
+    from .voice.tts import Speaker
+
+    config = load_config()
+    line = "Gideon here. If you can hear this, voice output is working."
+    try:
+        speaker = Speaker(config)
+    except RuntimeError as exc:  # missing ELEVENLABS_API_KEY
+        print(f"❌ {exc}")
+        return
+
+    if not speaker.voice_id:
+        print("❌ No elevenlabs_voice_id set in config.toml under [voice].")
+        return
+
+    print(f"Synthesizing with voice {speaker.voice_id}…")
+    try:
+        pcm = speaker.synthesize_bytes(line)
+    except RuntimeError as exc:
+        print(f"❌ {exc}")
+        return
+    except Exception as exc:
+        detail = str(exc)
+        if "missing_permissions" in detail or "text_to_speech" in detail:
+            print(
+                "❌ ElevenLabs key is missing the 'text_to_speech' permission.\n"
+                "   Dashboard → API Keys → edit this key → enable Text to Speech "
+                "(or regenerate), then update ELEVENLABS_API_KEY in .env."
+            )
+        elif "401" in detail or "invalid" in detail.lower():
+            print("❌ ElevenLabs rejected the key (401). Check ELEVENLABS_API_KEY in .env.")
+        else:
+            print(f"❌ Synthesis failed: {detail[:300]}")
+        return
+
+    print(f"✅ Synthesis OK — {len(pcm)} PCM bytes (~{len(pcm)/2/16000:.1f}s). Playing…")
+    try:
+        speaker.play_pcm(pcm)
+        print("✅ Playback done. If you heard it, voice output is good to go.")
+    except Exception as exc:
+        print(f"⚠️  Synthesis worked but playback failed (audio device?): {str(exc)[:200]}")
+
+
 # --- entrypoint --------------------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="gideon", description="Gideon — voice-first assistant")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--voice", action="store_true", help="push-to-talk voice mode")
+    group.add_argument("--voice-check", action="store_true", help="synthesize+play one test line")
     group.add_argument("--heartbeat", action="store_true", help="run the proactive background loop")
     group.add_argument("--kill", action="store_true", help="engage kill switch (pause proactive)")
     group.add_argument("--unkill", action="store_true", help="release kill switch")
@@ -207,6 +255,8 @@ def main() -> None:
     elif args.heartbeat:
         ensure_state_dirs()
         heartbeat_loop()
+    elif args.voice_check:
+        run_voice_check()
     elif args.voice:
         run_voice()
     else:

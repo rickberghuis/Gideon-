@@ -30,6 +30,32 @@ class Speaker:
         """Stop current playback ASAP (barge-in)."""
         self._stop.set()
 
+    @property
+    def voice_id(self) -> str:
+        return self._voice_id
+
+    def synthesize_bytes(self, text: str) -> bytes:
+        """Synthesize the whole line to PCM bytes (no playback). Raises on API errors,
+        so a permission/key problem surfaces cleanly. Used by `gideon --voice-check`."""
+        if not self._voice_id:
+            raise RuntimeError("No elevenlabs_voice_id set in config.toml")
+        audio = self._client.text_to_speech.convert(
+            voice_id=self._voice_id,
+            model_id=self._model,
+            text=text,
+            output_format="pcm_16000",
+        )
+        return b"".join(chunk for chunk in audio if chunk)
+
+    def play_pcm(self, pcm: bytes) -> None:
+        """Play raw 16 kHz mono PCM. Separate from synth so playback errors (no audio
+        device) don't get confused with synthesis errors."""
+        import numpy as np
+        import sounddevice as sd
+
+        sd.play(np.frombuffer(pcm, dtype="int16"), _PCM_RATE)
+        sd.wait()
+
     def speak(self, text: str) -> None:
         """Synthesize and play `text`, returning when done or interrupted."""
         text = text.strip()
