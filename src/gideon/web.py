@@ -15,8 +15,11 @@ proactive inbox in one place.
 from __future__ import annotations
 
 import json
+import os
+import secrets
 import threading
 import uuid
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -80,6 +83,9 @@ class _App:
         self.voice_enabled = bool(config.voice.get("enabled"))
         self._transcriber = None
         self._speaker = None
+        # Auth: a password gate for remote access. Empty password => auth off (local only).
+        self.password = os.environ.get("GIDEON_WEB_PASSWORD", "")
+        self.sessions: set[str] = set()
 
     def _voice_components(self):
         """Lazily build STT/TTS so a missing audio dep only breaks voice, not the whole face."""
@@ -151,7 +157,21 @@ class _Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             return {}
 
+    # --- auth helpers ---
+    def _authed(self) -> bool:
+        if not APP.password:  # no password configured => local, auth disabled
+            return True
+        cookie = SimpleCookie(self.headers.get("Cookie", ""))
+        token = cookie["gideon_session"].value if "gideon_session" in cookie else ""
+        return bool(token) and token in APP.sessions
+
     def do_GET(self) -> None:
+        if not self._authed():
+            if self.path == "/" or self.path.startswith("/index"):
+                self._send(200, _LOGIN_HTML.encode("utf-8"), "text/html; charset=utf-8")
+            else:
+                self._json({"error": "unauthorized"}, 401)
+            return
         if self.path == "/" or self.path.startswith("/index"):
             self._send(200, _INDEX_HTML.encode("utf-8"), "text/html; charset=utf-8")
         elif self.path == "/state":
@@ -163,7 +183,32 @@ class _Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         return self.rfile.read(length) if length else b""
 
+    def _login(self, body: dict[str, Any]) -> None:
+        ok = bool(APP.password) and secrets.compare_digest(
+            str(body.get("password", "")), APP.password
+        )
+        if not ok:
+            self._json({"ok": False}, 401)
+            return
+        token = secrets.token_urlsafe(24)
+        APP.sessions.add(token)
+        payload = json.dumps({"ok": True}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header(
+            "Set-Cookie", f"gideon_session={token}; HttpOnly; SameSite=Lax; Path=/"
+        )
+        self.end_headers()
+        self.wfile.write(payload)
+
     def do_POST(self) -> None:
+        if self.path == "/login":
+            self._login(self._read_json())
+            return
+        if not self._authed():
+            self._json({"error": "unauthorized"}, 401)
+            return
         if self.path == "/voice":
             audio = self._read_raw()
             try:
@@ -196,16 +241,26 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(404, b"not found", "text/plain")
 
 
-def run_web(port: int = 8000) -> None:
+def run_web(port: int = 8000, host: str = "127.0.0.1") -> None:
     global APP
+    # Safety: never expose an unauthenticated agent beyond this machine.
+    if host != "127.0.0.1" and not os.environ.get("GIDEON_WEB_PASSWORD"):
+        print(
+            "❌ Refusing to bind to a non-local address without a password.\n"
+            "   Set GIDEON_WEB_PASSWORD in .env before exposing Gideon "
+            "(and keep it behind Tailscale)."
+        )
+        return
+
     APP = _App()  # constructs the agent (needs ANTHROPIC_API_KEY)
 
     stop_event = threading.Event()
     threading.Thread(target=run_background, args=(stop_event,), daemon=True).start()
 
-    server = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
-    url = f"http://127.0.0.1:{port}"
-    print(f"🌐 Gideon's face is live at {url}  (Ctrl-C to stop)")
+    server = ThreadingHTTPServer((host, port), _Handler)
+    shown = "127.0.0.1" if host in ("127.0.0.1", "0.0.0.0") else host
+    auth = "password-protected" if APP.password else "local, no password"
+    print(f"🌐 Gideon's face is live at http://{shown}:{port}  ({auth}; Ctrl-C to stop)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -216,6 +271,40 @@ def run_web(port: int = 8000) -> None:
 
 
 # --- the UI (single self-contained page) -------------------------------------------------
+
+_LOGIN_HTML = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Gideon — sign in</title>
+<style>
+  body { margin:0; height:100vh; display:flex; align-items:center; justify-content:center;
+         background:#0f1115; color:#e7e9ee; font:15px -apple-system,Segoe UI,Roboto,sans-serif; }
+  .card { background:#171a21; border:1px solid #262b36; border-radius:14px; padding:28px; width:300px; }
+  h1 { font-size:18px; margin:0 0 4px; } p { color:#8b93a7; font-size:13px; margin:0 0 18px; }
+  input { width:100%; box-sizing:border-box; background:#0f1115; border:1px solid #262b36;
+          color:#e7e9ee; border-radius:8px; padding:10px 12px; font:inherit; }
+  button { width:100%; margin-top:12px; background:#2563eb; color:#fff; border:none;
+           border-radius:8px; padding:10px; font-weight:600; cursor:pointer; }
+  .err { color:#ff9b9b; font-size:13px; margin-top:10px; min-height:18px; }
+</style></head>
+<body>
+  <div class="card">
+    <h1>Gideon</h1><p>Enter your password to continue.</p>
+    <input id="pw" type="password" placeholder="Password" autofocus
+           onkeydown="if(event.key==='Enter')go()">
+    <button onclick="go()">Sign in</button>
+    <div class="err" id="err"></div>
+  </div>
+<script>
+async function go(){
+  const pw = document.getElementById('pw').value;
+  const r = await fetch('/login', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({password: pw})});
+  if (r.ok) { location.href = '/'; }
+  else { document.getElementById('err').textContent = 'Wrong password.'; }
+}
+</script>
+</body></html>
+"""
 
 _INDEX_HTML = """<!doctype html>
 <html lang="en">

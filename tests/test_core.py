@@ -234,3 +234,33 @@ def test_web_confirmer_allow_and_deny():
         conf.resolve(snap["id"], verdict)
         t.join(timeout=2)
         assert result["r"] is verdict
+
+
+# --- Web auth: password gate for remote access -------------------------------------------
+
+def test_web_auth_cookie_logic():
+    import gideon.web as web
+
+    handler = web._Handler.__new__(web._Handler)  # no socket needed
+    app = type("FakeApp", (), {"password": "secret", "sessions": {"good"}})()
+    web.APP = app
+
+    handler.headers = {"Cookie": ""}
+    assert handler._authed() is False                      # no cookie
+    handler.headers = {"Cookie": "gideon_session=good"}
+    assert handler._authed() is True                       # valid session
+    handler.headers = {"Cookie": "gideon_session=bad"}
+    assert handler._authed() is False                      # unknown token
+
+    app.password = ""                                      # no password => local, auth off
+    handler.headers = {"Cookie": ""}
+    assert handler._authed() is True
+
+
+def test_web_refuses_unauthenticated_remote_bind(monkeypatch):
+    import gideon.web as web
+
+    monkeypatch.delenv("GIDEON_WEB_PASSWORD", raising=False)
+    web.APP = None
+    web.run_web(port=0, host="0.0.0.0")  # must bail out before constructing the app
+    assert web.APP is None

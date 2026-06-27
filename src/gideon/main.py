@@ -251,12 +251,18 @@ def main() -> None:
     group.add_argument("--kill", action="store_true", help="engage kill switch (pause proactive)")
     group.add_argument("--unkill", action="store_true", help="release kill switch")
     parser.add_argument("--port", type=int, default=8000, help="port for --web (default 8000)")
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="bind address for --web. Default 127.0.0.1 (local only). Use 0.0.0.0 to expose "
+        "on the network — requires GIDEON_WEB_PASSWORD (keep behind Tailscale).",
+    )
     args = parser.parse_args()
 
     if args.web:
         from .web import run_web
 
-        run_web(args.port)
+        run_web(args.port, args.host)
     elif args.kill:
         print(engage_kill_switch())
     elif args.unkill:

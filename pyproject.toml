@@ -18,6 +18,11 @@ voice = [
     "soundfile>=0.12",
     "pynput>=1.7",
 ]
+# Headless server (Docker): browser-voice needs only the HTTP SDKs — no PortAudio/X11.
+server = [
+    "deepgram-sdk>=6.0",
+    "elevenlabs>=2.0",
+]
 dev = ["pytest>=8.0"]
 
 [project.scripts]

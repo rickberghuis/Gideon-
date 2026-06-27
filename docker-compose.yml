@@ -1,0 +1,12 @@
+# Always-on Gideon. One container = chat face + background heartbeat.
+#   docker compose up -d --build
+services:
+  gideon:
+    build: .
+    container_name: gideon
+    restart: unless-stopped        # survives crashes and host reboots
+    env_file: .env                 # ANTHROPIC/DEEPGRAM/ELEVENLABS keys + GIDEON_WEB_PASSWORD
+    ports:
+      - "127.0.0.1:8000:8000"      # host-local only; Tailscale serves it to your devices
+    volumes:
+      - ./state:/app/state         # durable: memory, reminders, inbox, schedule, audit log

@@ -57,6 +57,11 @@ bash scripts/install-login-agent.sh uninstall   # stop + remove
 Or double-click **`scripts/Start Gideon.command`** in Finder to launch it and open the browser.
 Logs go to `state/web.log`.
 
+**Use it from your phone / always-on:** see [DEPLOY.md](DEPLOY.md) — run Gideon 24/7 on a cloud
+VPS or a Raspberry Pi (Docker), reachable privately from your devices over Tailscale. Exposing
+it beyond localhost (`--host 0.0.0.0`) requires `GIDEON_WEB_PASSWORD`; the server refuses
+otherwise, and remote access shows a login page.
+
 In the text REPL: `dismiss <id>` clears an inbox notice, `/cost` shows the session cost,
 `/kill` `/unkill` toggle the kill switch, `exit` quits.
 
