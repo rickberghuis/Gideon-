@@ -12,8 +12,8 @@ dependencies = [
 [project.optional-dependencies]
 # Tier 3 voice. Install with: pip install -e ".[voice]"
 voice = [
-    "deepgram-sdk>=3.0",
-    "elevenlabs>=1.0",
+    "deepgram-sdk>=6.0",
+    "elevenlabs>=2.0",
     "sounddevice>=0.4",
     "soundfile>=0.12",
     "pynput>=1.7",

@@ -13,20 +13,21 @@ class Transcriber:
     def __init__(self, config: Config) -> None:
         self._config = config
         self._model = config.voice.get("deepgram_model", "nova-2")
-        from deepgram import DeepgramClient  # lazy import
+        from deepgram import DeepgramClient  # lazy import (deepgram-sdk 6.x)
 
-        self._client = DeepgramClient(require_env("DEEPGRAM_API_KEY"))
+        self._client = DeepgramClient(api_key=require_env("DEEPGRAM_API_KEY"))
 
     def transcribe(self, pcm_bytes: bytes, sample_rate: int) -> str:
         if not pcm_bytes:
             return ""
-        from deepgram import PrerecordedOptions
-
-        # Wrap raw PCM in a WAV container so Deepgram knows the format.
+        # Wrap raw PCM in a WAV container so Deepgram auto-detects rate/encoding.
         wav = _wrap_pcm_as_wav(pcm_bytes, sample_rate)
-        options = PrerecordedOptions(model=self._model, smart_format=True, language="en")
-        source = {"buffer": wav, "mimetype": "audio/wav"}
-        response = self._client.listen.rest.v("1").transcribe_file(source, options)
+        response = self._client.listen.v1.media.transcribe_file(
+            request=wav,
+            model=self._model,
+            smart_format=True,
+            language="en",
+        )
         try:
             return response.results.channels[0].alternatives[0].transcript.strip()
         except (AttributeError, IndexError):

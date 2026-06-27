@@ -12,9 +12,9 @@ input_price_per_mtok = 3.0
 output_price_per_mtok = 15.0
 
 [voice]
-# Filled in at Tier 3. ElevenLabs voice id + STT model.
-enabled = false
-elevenlabs_voice_id = ""
+# Tier 3. ElevenLabs voice id + STT model.
+enabled = true
+elevenlabs_voice_id = "hpp4J3VqNfWAUOO0d1Us"  # Bella — professional, bright, warm
 elevenlabs_model = "eleven_turbo_v2_5"
 deepgram_model = "nova-2"
 # Push-to-talk key (held while speaking).
