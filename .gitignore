@@ -1,0 +1,20 @@
+# Secrets — never commit
+.env
+
+# Durable runtime state (memory, inbox, schedule, audit log)
+state/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+build/
+dist/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

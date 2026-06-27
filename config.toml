@@ -1,0 +1,53 @@
+# Gideon configuration — tunables live here, not in code.
+# Edit a value, restart; no code change needed.
+
+[model]
+# Start cheap for iteration; promote to the top model once stable.
+# Options: "claude-sonnet-4-6" (cheap iter), "claude-opus-4-8" (top).
+name = "claude-sonnet-4-6"
+max_tokens = 1024
+# Per-million-token prices (USD) for the running cost tally in the audit log.
+# Update if you change models. (sonnet-4-6 reference values.)
+input_price_per_mtok = 3.0
+output_price_per_mtok = 15.0
+
+[voice]
+# Filled in at Tier 3. ElevenLabs voice id + STT model.
+enabled = false
+elevenlabs_voice_id = ""
+elevenlabs_model = "eleven_turbo_v2_5"
+deepgram_model = "nova-2"
+# Push-to-talk key (held while speaking).
+push_to_talk_key = "space"
+
+[safety]
+# Tools that must get an explicit per-action yes before running.
+# These map to the "never without asking" list.
+gated_actions = ["send", "spend", "delete", "change_setting"]
+# Kill switch: when true, all proactive (heartbeat) behavior is paused.
+proactive_paused = false
+
+[heartbeat]
+# The background loop (Tier 5). Lives here so it can relocate to an always-on host.
+enabled = true
+tick_seconds = 30
+# Non-urgent surfacing waits for waking hours (24h clock, local time).
+quiet_hours_start = 22
+quiet_hours_end = 8
+# How long a background action waits for human approval before timing out
+# to the safe default (do nothing, leave a note).
+approval_timeout_seconds = 120
+
+# Scheduled checks. Each is its own unit: how often, and how loud it may be.
+# severity "log" = goes to the calm inbox; "interrupt" = may interrupt (still respects quiet hours).
+[[heartbeat.checks]]
+name = "due_reminders"
+every_seconds = 60
+severity = "interrupt"
+description = "Surface reminders that have come due."
+
+[[heartbeat.checks]]
+name = "heartbeat_demo"
+every_seconds = 45
+severity = "log"
+description = "Demo check for Tier 5 verification; surfaces a note when state/trigger.txt exists."
