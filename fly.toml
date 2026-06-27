@@ -1,0 +1,27 @@
+# Fly.io deploy for Gideon — cheapest easy always-on host (~$2-4/mo).
+#   fly launch --copy-config --no-deploy     # create the app from this file
+#   fly volumes create gideon_data --size 1  # persistent state (memory, reminders, ...)
+#   fly secrets set ANTHROPIC_API_KEY=... DEEPGRAM_API_KEY=... ELEVENLABS_API_KEY=... GIDEON_WEB_PASSWORD=...
+#   fly deploy
+app = "gideon"
+primary_region = "ams"   # pick one near you: ams, lhr, fra, iad, ...
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8000
+  force_https = true            # HTTPS so the browser mic works on your phone
+  # Keep it ALWAYS on (the heartbeat must keep beating): don't auto-stop.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+# Durable state survives deploys/restarts.
+[mounts]
+  source = "gideon_data"
+  destination = "/app/state"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

@@ -275,20 +275,37 @@ def run_web(port: int = 8000, host: str = "127.0.0.1") -> None:
 _LOGIN_HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Gideon — sign in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
 <style>
   body { margin:0; height:100vh; display:flex; align-items:center; justify-content:center;
-         background:#0f1115; color:#e7e9ee; font:15px -apple-system,Segoe UI,Roboto,sans-serif; }
-  .card { background:#171a21; border:1px solid #262b36; border-radius:14px; padding:28px; width:300px; }
-  h1 { font-size:18px; margin:0 0 4px; } p { color:#8b93a7; font-size:13px; margin:0 0 18px; }
-  input { width:100%; box-sizing:border-box; background:#0f1115; border:1px solid #262b36;
-          color:#e7e9ee; border-radius:8px; padding:10px 12px; font:inherit; }
-  button { width:100%; margin-top:12px; background:#2563eb; color:#fff; border:none;
-           border-radius:8px; padding:10px; font-weight:600; cursor:pointer; }
+         color:#dff1ff; font:15px -apple-system,Segoe UI,Roboto,sans-serif;
+         background:
+           radial-gradient(900px 500px at 50% 0%, rgba(34,211,238,.12), transparent 60%),
+           radial-gradient(circle, rgba(86,170,255,.10) 1px, transparent 1px) 0 0/15px 15px, #03070f; }
+  .card { background:rgba(8,22,36,.6); border:1px solid rgba(56,189,248,.3); border-radius:16px;
+          padding:30px; width:300px; text-align:center; backdrop-filter:blur(4px);
+          box-shadow:0 0 40px rgba(56,189,248,.18); }
+  .orb { width:84px; height:84px; margin:0 auto 16px; border-radius:50%;
+    background:radial-gradient(circle at 50% 38%, #d9f7ff, #34d3ee 34%, #0a4d6b 70%, transparent 76%);
+    box-shadow:0 0 30px 8px rgba(34,211,238,.5), inset 0 0 22px rgba(190,242,255,.65);
+    animation:breathe 3.6s ease-in-out infinite; }
+  @keyframes breathe { 0%,100%{transform:scale(1);} 50%{transform:scale(1.06);filter:brightness(1.15);} }
+  h1 { font-family:'Orbitron',monospace; font-size:20px; letter-spacing:7px; margin:0 0 4px;
+       color:#cfeeff; text-shadow:0 0 14px rgba(56,189,248,.75); }
+  p { color:#6f9fc8; font-size:13px; margin:0 0 18px; }
+  input { width:100%; box-sizing:border-box; background:rgba(6,18,30,.7); border:1px solid rgba(56,189,248,.3);
+          color:#dff1ff; border-radius:8px; padding:10px 12px; font:inherit; }
+  input:focus { outline:none; border-color:#38bdf8; box-shadow:0 0 12px rgba(56,189,248,.4); }
+  button { width:100%; margin-top:12px; background:rgba(34,120,180,.7); color:#eaf8ff;
+           border:1px solid rgba(120,210,255,.5); border-radius:8px; padding:10px; font-weight:600;
+           cursor:pointer; text-shadow:0 0 8px rgba(56,189,248,.6); }
   .err { color:#ff9b9b; font-size:13px; margin-top:10px; min-height:18px; }
 </style></head>
 <body>
   <div class="card">
-    <h1>Gideon</h1><p>Enter your password to continue.</p>
+    <div class="orb"></div>
+    <h1>GIDEON</h1><p>Enter your password to continue.</p>
     <input id="pw" type="password" placeholder="Password" autofocus
            onkeydown="if(event.key==='Enter')go()">
     <button onclick="go()">Sign in</button>
@@ -312,61 +329,106 @@ _INDEX_HTML = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gideon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0f1115; --panel:#171a21; --me:#2563eb; --bot:#222733; --text:#e7e9ee;
-          --muted:#8b93a7; --warn:#3a2a12; --warnb:#b9821f; --line:#262b36; }
+  :root { --bg:#03070f; --panel:rgba(10,30,48,.6); --me:rgba(30,96,150,.55);
+          --bot:rgba(12,34,54,.5); --text:#dff1ff; --muted:#6f9fc8;
+          --cyan:#38bdf8; --line:rgba(56,189,248,.22);
+          --warn:rgba(60,40,10,.55); --warnb:#d6a23a; }
   * { box-sizing:border-box; }
   body { margin:0; font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;
-         background:var(--bg); color:var(--text); height:100vh; display:flex; }
-  #wrap { display:flex; flex-direction:column; flex:1; max-width:760px; margin:0 auto; height:100vh; }
-  header { padding:14px 18px; border-bottom:1px solid var(--line); display:flex;
-           align-items:center; gap:10px; }
-  header h1 { font-size:16px; margin:0; font-weight:600; }
-  header .sub { color:var(--muted); font-size:12px; }
-  header .right { margin-left:auto; display:flex; gap:10px; align-items:center; font-size:12px; }
+         color:var(--text); height:100vh; display:flex; overflow:hidden;
+         background:
+           radial-gradient(1200px 600px at 50% -10%, rgba(34,211,238,.10), transparent 60%),
+           radial-gradient(circle, rgba(86,170,255,.10) 1px, transparent 1px) 0 0/15px 15px,
+           var(--bg); }
+  #wrap { display:flex; flex-direction:column; flex:1; max-width:780px; margin:0 auto; height:100vh; }
+  header { padding:14px 18px; display:flex; align-items:center; gap:10px;
+           border-bottom:1px solid var(--line); }
+  .brand { font-family:'Orbitron',Menlo,Consolas,monospace; font-weight:700; font-size:19px;
+           letter-spacing:7px; color:#cfeeff; text-shadow:0 0 14px rgba(56,189,248,.75); }
+  header .right { margin-left:auto; display:flex; gap:12px; align-items:center; font-size:12px; }
+  #cost { color:var(--muted); }
   #kill { cursor:pointer; border:1px solid var(--line); background:var(--panel); color:var(--text);
           padding:4px 10px; border-radius:6px; }
-  #kill.on { background:#3a1212; border-color:#7a2a2a; color:#ffb4b4; }
+  #kill.on { background:rgba(90,20,20,.5); border-color:#7a2a2a; color:#ffb4b4; }
+
+  /* the Gideon orb */
+  #orb-wrap { display:flex; flex-direction:column; align-items:center; padding:18px 0 8px; }
+  #orb { position:relative; width:122px; height:122px; }
+  #orb .core { position:absolute; inset:26px; border-radius:50%;
+    background:radial-gradient(circle at 50% 38%, #d9f7ff, #34d3ee 34%, #0a4d6b 70%, transparent 76%);
+    box-shadow:0 0 34px 10px rgba(34,211,238,.5), 0 0 90px 26px rgba(14,165,233,.32),
+               inset 0 0 26px rgba(190,242,255,.65);
+    animation:breathe 3.6s ease-in-out infinite; }
+  #orb .ring { position:absolute; inset:0; border-radius:50%; border:1px dashed rgba(56,189,248,.4);
+    animation:spin 9s linear infinite; }
+  #orb .ring.r2 { inset:13px; border-style:solid; border-color:rgba(56,189,248,.18);
+    animation:spin 14s linear infinite reverse; }
+  #orb.thinking .ring { animation-duration:1.7s; border-color:rgba(120,225,255,.7); }
+  #orb.thinking .ring.r2 { animation-duration:2.5s; }
+  #orb.thinking .core { animation:breathe 1s ease-in-out infinite; }
+  #orb.speaking .core { animation:speak .34s ease-in-out infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes breathe { 0%,100%{transform:scale(1);filter:brightness(1);}
+                       50%{transform:scale(1.05);filter:brightness(1.18);} }
+  @keyframes speak { 0%,100%{transform:scale(1);} 50%{transform:scale(1.13);filter:brightness(1.35);} }
+  #status { margin-top:12px; letter-spacing:4px; font-size:10px; color:var(--cyan);
+            text-shadow:0 0 8px rgba(56,189,248,.8); }
+
   #inbox { padding:0 18px; }
   .notice { background:var(--panel); border:1px solid var(--line); border-radius:8px;
-            padding:8px 10px; margin-top:10px; display:flex; gap:8px; align-items:center; font-size:13px; }
+            padding:8px 10px; margin-top:10px; display:flex; gap:8px; align-items:center; font-size:13px;
+            backdrop-filter:blur(3px); }
   .notice button { margin-left:auto; }
   #log { flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:12px; }
-  .msg { max-width:80%; padding:9px 13px; border-radius:14px; white-space:pre-wrap; word-wrap:break-word; }
-  .me { background:var(--me); color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
-  .bot { background:var(--bot); align-self:flex-start; border-bottom-left-radius:4px; }
-  .who { font-size:11px; color:var(--muted); margin:0 4px -6px; }
+  .msg { max-width:80%; padding:9px 13px; border-radius:14px; white-space:pre-wrap; word-wrap:break-word;
+         border:1px solid rgba(56,189,248,.25); background:var(--bot);
+         box-shadow:0 0 14px rgba(56,189,248,.10); backdrop-filter:blur(3px); }
+  .me { background:var(--me); border-color:rgba(140,210,255,.45); align-self:flex-end;
+        border-bottom-right-radius:4px; }
+  .bot { align-self:flex-start; border-bottom-left-radius:4px; }
+  .who { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin:0 6px -6px; }
   .me-who { align-self:flex-end; } .bot-who { align-self:flex-start; }
   #confirm { margin:0 18px; background:var(--warn); border:1px solid var(--warnb);
              border-radius:10px; padding:12px 14px; display:none; }
   #confirm h3 { margin:0 0 6px; font-size:14px; color:#ffd58a; }
   #confirm .args { color:var(--muted); font-size:12px; margin:6px 0 10px; word-break:break-all; }
   #confirm .row { display:flex; gap:8px; }
-  button { cursor:pointer; border:none; border-radius:7px; padding:7px 14px; font-size:13px;
-           font-weight:600; }
+  button { cursor:pointer; border:none; border-radius:7px; padding:7px 14px; font-size:13px; font-weight:600; }
   .allow { background:#1f7a3d; color:#fff; } .deny { background:#7a2a2a; color:#fff; }
-  .dismiss { background:var(--bot); color:var(--text); padding:4px 10px; }
+  .dismiss { background:var(--bot); color:var(--text); border:1px solid var(--line); padding:4px 10px; }
   footer { padding:12px 18px; border-top:1px solid var(--line); display:flex; gap:10px; }
-  #in { flex:1; resize:none; background:var(--panel); border:1px solid var(--line);
+  #in { flex:1; resize:none; background:rgba(6,18,30,.7); border:1px solid var(--line);
         color:var(--text); border-radius:10px; padding:10px 12px; font:inherit; max-height:120px; }
-  #send { background:var(--me); color:#fff; }
+  #in:focus { outline:none; border-color:var(--cyan); box-shadow:0 0 12px rgba(56,189,248,.4); }
+  #send { background:rgba(34,120,180,.7); color:#eaf8ff; border:1px solid rgba(120,210,255,.5);
+          text-shadow:0 0 8px rgba(56,189,248,.6); }
   #send:disabled, #mic:disabled { opacity:.5; cursor:default; }
-  #mic { background:var(--bot); color:var(--text); font-size:16px; }
-  #mic.rec { background:#7a2a2a; color:#fff; animation:pulse 1s infinite; }
-  @keyframes pulse { 50% { opacity:.55; } }
+  #mic { background:var(--bot); color:var(--cyan); border:1px solid var(--line); font-size:16px; }
+  #mic.rec { background:#7a2a2a; color:#fff; animation:blink 1s infinite; }
+  @keyframes blink { 50% { opacity:.55; } }
   .typing { color:var(--muted); font-style:italic; }
 </style>
 </head>
 <body>
 <div id="wrap">
   <header>
-    <h1>Gideon</h1>
-    <span class="sub">local · 127.0.0.1</span>
+    <span class="brand">GIDEON</span>
     <div class="right">
       <span id="cost"></span>
       <span id="kill" title="Pause all proactive behavior">heartbeat: on</span>
     </div>
   </header>
+  <div id="orb-wrap">
+    <div id="orb">
+      <div class="ring r1"></div>
+      <div class="ring r2"></div>
+      <div class="core"></div>
+    </div>
+    <div id="status">ONLINE</div>
+  </div>
   <div id="inbox"></div>
   <div id="confirm">
     <h3 id="confirm-summary"></h3>
@@ -387,7 +449,15 @@ _INDEX_HTML = """<!doctype html>
 const log = document.getElementById('log');
 const input = document.getElementById('in');
 const sendBtn = document.getElementById('send');
+const orb = document.getElementById('orb');
+const statusEl = document.getElementById('status');
 let pendingId = null;
+
+function setOrb(state) {
+  orb.className = state;
+  statusEl.textContent = state === 'thinking' ? 'THINKING…'
+    : state === 'speaking' ? 'SPEAKING' : 'ONLINE';
+}
 
 function bubble(text, who) {
   const w = document.createElement('div');
@@ -406,7 +476,7 @@ async function send() {
   if (!text) return;
   input.value = ''; input.style.height = 'auto';
   bubble(text, 'me');
-  sendBtn.disabled = true;
+  sendBtn.disabled = true; setOrb('thinking');
   const typing = bubble('thinking…', 'bot'); typing.classList.add('typing');
   try {
     const r = await fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'},
@@ -414,9 +484,11 @@ async function send() {
     const data = await r.json();
     typing.classList.remove('typing');
     typing.textContent = data.reply || '(no reply)';
+    setOrb('speaking'); setTimeout(() => setOrb(''), 1400);
   } catch (e) {
     typing.classList.remove('typing');
     typing.textContent = '⚠️ could not reach the server';
+    setOrb('');
   } finally {
     sendBtn.disabled = false; input.focus();
     refresh();
@@ -507,7 +579,7 @@ function stopRec() {
 }
 
 async function sendVoice(blob) {
-  sendBtn.disabled = true; mic.disabled = true;
+  sendBtn.disabled = true; mic.disabled = true; setOrb('thinking');
   const meMsg = bubble('🎤 …', 'me');
   const typing = bubble('listening…', 'bot'); typing.classList.add('typing');
   try {
@@ -515,14 +587,17 @@ async function sendVoice(blob) {
       headers: {'Content-Type': blob.type || 'audio/webm'}, body: blob});
     const data = await r.json();
     typing.classList.remove('typing');
-    if (data.error) { meMsg.textContent = '🎤'; typing.textContent = '⚠️ ' + data.error; }
+    if (data.error) { meMsg.textContent = '🎤'; typing.textContent = '⚠️ ' + data.error; setOrb(''); }
     else {
       meMsg.textContent = data.transcript || '(unclear)';
       typing.textContent = data.reply || '(no reply)';
-      if (data.audio) new Audio('data:audio/mp3;base64,' + data.audio).play();
+      if (data.audio) {
+        const a = new Audio('data:audio/mp3;base64,' + data.audio);
+        setOrb('speaking'); a.onended = () => setOrb(''); a.play();
+      } else { setOrb('speaking'); setTimeout(() => setOrb(''), 1400); }
     }
   } catch (e) {
-    typing.classList.remove('typing'); typing.textContent = '⚠️ voice request failed';
+    typing.classList.remove('typing'); typing.textContent = '⚠️ voice request failed'; setOrb('');
   } finally { sendBtn.disabled = false; mic.disabled = false; refresh(); }
 }
 

@@ -85,6 +85,27 @@ docker compose logs -f                                 # logs
 - **Change a setting** (model, quiet hours, voice id): edit `config.toml` on the host, then
   `docker compose restart`.
 
+## Cheapest + easiest option: Fly.io (public URL + password)
+
+If you'd rather not manage a VPS, Fly.io runs the included `Dockerfile` directly and is the
+lowest-effort always-on host (~$2–4/month for a tiny machine). It gives a public HTTPS URL
+protected by your `GIDEON_WEB_PASSWORD` (no Tailscale needed, though the URL is public — the
+password and HTTPS are what protect it, so make the password long).
+
+```bash
+# one-time: install flyctl, then from the project folder
+fly launch --copy-config --no-deploy            # uses the included fly.toml
+fly volumes create gideon_data --size 1         # durable state
+fly secrets set ANTHROPIC_API_KEY=... DEEPGRAM_API_KEY=... \
+                ELEVENLABS_API_KEY=... GIDEON_WEB_PASSWORD=<long-random>
+fly deploy
+fly open                                          # opens your https URL
+```
+
+`fly.toml` pins `min_machines_running = 1` and disables auto-stop so the heartbeat keeps
+beating. Update later with `fly deploy`. Truly free alternative: an Oracle Cloud "Always Free"
+VM, then follow the VPS + Tailscale steps above (more setup, $0 forever).
+
 ## Security notes
 - Bound to `127.0.0.1` on the host and served only over your tailnet — not on the public
   internet. The password is a second layer on top of that.
