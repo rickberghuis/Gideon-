@@ -10,7 +10,10 @@ ENV PYTHONUNBUFFERED=1
 # Install deps first for better layer caching.
 COPY pyproject.toml ./
 COPY src ./src
-RUN pip install --no-cache-dir -e ".[server]"
+# Pre-install the build backend so the project install doesn't fetch it mid-build,
+# and add retries/timeout so a transient PyPI blip doesn't fail the whole build.
+RUN pip install --no-cache-dir --retries 5 --timeout 120 --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --retries 5 --timeout 120 --no-build-isolation -e ".[server]"
 
 # App config (tunables). Secrets come from the environment at runtime, never baked in.
 COPY config.toml ./
