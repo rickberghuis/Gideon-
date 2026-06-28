@@ -12,6 +12,7 @@ Every mode drives the SAME agent core. Voice and the heartbeat are adapters on i
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import threading
 from queue import Queue
@@ -250,7 +251,12 @@ def main() -> None:
     group.add_argument("--heartbeat", action="store_true", help="run the proactive background loop")
     group.add_argument("--kill", action="store_true", help="engage kill switch (pause proactive)")
     group.add_argument("--unkill", action="store_true", help="release kill switch")
-    parser.add_argument("--port", type=int, default=8000, help="port for --web (default 8000)")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("PORT", "8000")),
+        help="port for --web (default 8000, or $PORT if the host sets it)",
+    )
     parser.add_argument(
         "--host",
         default="127.0.0.1",

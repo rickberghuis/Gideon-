@@ -85,6 +85,23 @@ docker compose logs -f                                 # logs
 - **Change a setting** (model, quiet hours, voice id): edit `config.toml` on the host, then
   `docker compose restart`.
 
+## No-terminal option: Railway (deploys from GitHub in the browser)
+
+Once the code is on GitHub, this is the most point-and-click way — no CLI at all.
+
+1. Go to [railway.app](https://railway.app) → sign in **with GitHub**.
+2. **New Project → Deploy from GitHub repo →** pick your `Gideon-` repo. Railway detects the
+   `Dockerfile` and builds it.
+3. Open the service → **Variables** → add: `ANTHROPIC_API_KEY`, `DEEPGRAM_API_KEY`,
+   `ELEVENLABS_API_KEY`, `GIDEON_WEB_PASSWORD` (long/random).
+4. **Volumes** → add a volume mounted at `/app/state` (keeps memory/reminders/inbox).
+5. **Settings → Networking → Generate Domain** → gives you a public HTTPS URL.
+6. Open the URL, enter your password. Done. (The app reads Railway's `$PORT` automatically.)
+
+Always-on by default; ~$5/month usage-based (starts with trial credit). Public URL guarded by
+your password + HTTPS. Render works the same way, but its free tier sleeps (bad for the
+heartbeat), so use a paid Render plan or Railway.
+
 ## Cheapest + easiest option: Fly.io (public URL + password)
 
 If you'd rather not manage a VPS, Fly.io runs the included `Dockerfile` directly and is the
